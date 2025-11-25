@@ -101,8 +101,7 @@ def extract_features(text: str) -> np.ndarray:
 
 class AnomalyModel:
     def __init__(self):
-        # Dummy training on synthetic "benign-like" data for demo
-        # In production, train offline and load from disk.
+        
         rng = np.random.RandomState(42)
         benign_samples = []
         for _ in range(200):
