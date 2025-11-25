@@ -2,7 +2,7 @@
 import random
 from typing import Tuple
 
-# For demo I show ~12; you can easily expand to 100+ by varying separators & wording.
+
 PPA_TEMPLATES = [
     "### SYSTEM GUARD ###\nUserQuery:\n{prompt}\n### END GUARD ###",
     "<SAFE_REQUEST>\n{prompt}\n</SAFE_REQUEST>",
