@@ -77,15 +77,6 @@ export default function LandingPage() {
             </Button>
           </div>
 
-          <div className="pt-8 border-t border-border/30">
-            <p className="text-muted-foreground text-sm mb-4">TRUSTED BY TEAMS AT</p>
-            <div className="flex flex-wrap justify-center gap-8 items-center opacity-60">
-              <div className="text-lg font-semibold">OpenAI</div>
-              <div className="text-lg font-semibold">Anthropic</div>
-              <div className="text-lg font-semibold">Google</div>
-              <div className="text-lg font-semibold">Meta</div>
-            </div>
-          </div>
         </div>
       </section>
 

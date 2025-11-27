@@ -5,3 +5,11 @@ scikit-learn
 numpy
 sqlalchemy
 python-multipart
+vosk
+pydub
+easyocr
+pillow
+piexif
+requests
+PyPDF2
+python-docx

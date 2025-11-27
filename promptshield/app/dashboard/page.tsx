@@ -93,18 +93,8 @@ export default function Dashboard() {
             </div>
 
             <div className="pt-6 border-t border-border/30">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resources</h3>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <a href="#" className="block hover:text-primary transition-colors">
-                  Documentation
-                </a>
-                <a href="#" className="block hover:text-primary transition-colors">
-                  API Reference
-                </a>
-                <a href="#" className="block hover:text-primary transition-colors">
-                  Status Page
-                </a>
-              </div>
+
+              
             </div>
           </div>
         </aside>

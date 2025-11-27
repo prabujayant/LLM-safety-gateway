@@ -23,6 +23,8 @@ dist/
 *.swo
 *~
 *.iml
+.env.local
+.env
 
 # OS
 .DS_Store

@@ -34,6 +34,9 @@ class AttackLogItem(BaseModel):
     entropy_score: int
     anomaly_score: int
     ppa_template_id: Optional[str]
+    raw_prompt: str
+    sanitized_prompt: str
+    wrapped_prompt: str
 
 
 class AttackHistoryResponse(BaseModel):
