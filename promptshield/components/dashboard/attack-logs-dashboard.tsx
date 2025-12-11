@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Fragment } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   BarChart,
@@ -90,7 +90,7 @@ export default function AttackLogsDashboard({ showAnalyticsOnly }: AttackLogsDas
     }
 
     fetchLogs()
-    
+
     // Refresh logs every 3 seconds
     const interval = setInterval(fetchLogs, 3000)
     return () => clearInterval(interval)
@@ -242,7 +242,7 @@ export default function AttackLogsDashboard({ showAnalyticsOnly }: AttackLogsDas
                         if (score >= 25) return "bg-yellow-500/5 hover:bg-yellow-500/10"
                         return "bg-green-500/5 hover:bg-green-500/10"
                       }
-                      
+
                       const getRiskColor = (score: number) => {
                         if (score >= 75) return "text-red-600 font-bold"
                         if (score >= 50) return "text-amber-600 font-bold"
@@ -251,8 +251,8 @@ export default function AttackLogsDashboard({ showAnalyticsOnly }: AttackLogsDas
                       }
 
                       return (
-                        <>
-                          <tr key={log.id} className={`border-b border-border/30 transition-colors cursor-pointer ${getSeverityColor(log.total_score)}`}
+                        <Fragment key={log.id}>
+                          <tr className={`border-b border-border/30 transition-colors cursor-pointer ${getSeverityColor(log.total_score)}`}
                             onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
                           >
                             <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{log.id}</td>
@@ -261,13 +261,12 @@ export default function AttackLogsDashboard({ showAnalyticsOnly }: AttackLogsDas
                             </td>
                             <td className="px-4 py-3">
                               <span
-                                className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                                  log.action === "block"
+                                className={`px-3 py-1 rounded-full text-xs font-semibold border ${log.action === "block"
                                     ? "bg-red-500/10 text-red-600 border-red-200"
                                     : log.action === "sanitize"
                                       ? "bg-amber-500/10 text-amber-600 border-amber-200"
                                       : "bg-green-500/10 text-green-600 border-green-200"
-                                }`}
+                                  }`}
                               >
                                 {log.action.toUpperCase()}
                               </span>
@@ -329,7 +328,7 @@ export default function AttackLogsDashboard({ showAnalyticsOnly }: AttackLogsDas
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       )
                     })}
                   </tbody>

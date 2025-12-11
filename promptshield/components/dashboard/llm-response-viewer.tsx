@@ -40,6 +40,12 @@ export default function LLMResponseViewer({ threatData }: LLMResponseViewerProps
 
       if (!response.ok) {
         const errorData = await response.json()
+
+        // Show detailed error message with retry info
+        if (errorData.details) {
+          throw new Error(`${errorData.error}\n\n${errorData.details}`)
+        }
+
         throw new Error(errorData.error || "Failed to get Gemini response")
       }
 
@@ -104,7 +110,7 @@ export default function LLMResponseViewer({ threatData }: LLMResponseViewerProps
         </Button>
 
         {error && (
-          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive whitespace-pre-wrap">
             {error}
           </div>
         )}
