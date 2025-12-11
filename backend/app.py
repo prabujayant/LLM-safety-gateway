@@ -1,5 +1,8 @@
 # backend/app.py
 import time
+import random
+import csv
+import os
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -16,7 +19,10 @@ from models import (
     LayerScores,
     AttackHistoryResponse,
     AttackLogItem,
+
 )
+
+import requests
 
 app = FastAPI(title="PromptShield")
 
@@ -30,6 +36,24 @@ app.add_middleware(
 )
 
 init_db()
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "llama3.2"
+
+
+def call_ollama(prompt: str) -> str:
+    """Call local Ollama and return response text."""
+    try:
+        response = requests.post(
+            OLLAMA_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=60
+        )
+        if response.ok:
+            return response.json().get("response", "")
+        return f"[Ollama Error: {response.status_code}]"
+    except Exception as e:
+        return f"[Ollama Error: {str(e)}]"
 
 
 def get_db():
@@ -235,6 +259,20 @@ async def analyze_image_endpoint(file: UploadFile = File(...)):
             # Run through threat detection pipeline
             risk = compute_risk(extracted_text)
             
+            # Incorporate QR classification into risk score
+            qr_class = analysis.get("qr_classification", {})
+            if qr_class.get("is_malicious"):
+                # Add QR risk to the total score
+                qr_score = int(qr_class.get("confidence", 0.5) * 80)  # Up to 80 points
+                risk["qr_score"] = qr_score
+                risk["total_score"] = min(100, risk["total_score"] + qr_score)
+                # Update action based on new total
+                if risk["total_score"] > 70:
+                    risk["action"] = "block"
+                elif risk["total_score"] > 30:
+                    risk["action"] = "sanitize"
+                print(f"[ImageAPI] QR Malicious detected! Added {qr_score} to risk score. New total: {risk['total_score']}")
+            
             if risk["action"] in ("sanitize", "block"):
                 sanitized_result = sanitize_text(extracted_text)
                 sanitized = sanitized_result["text"]
@@ -277,6 +315,7 @@ async def analyze_image_endpoint(file: UploadFile = File(...)):
                     "wrapped": wrapped,
                     "template_id": template_id,
                 },
+                "qr_classification": qr_class,
                 "ocr_confidence": analysis.get("ocr_confidence", 0)
             }
         else:
@@ -426,3 +465,27 @@ async def analyze_document_endpoint(file: UploadFile = File(...)):
             "error": str(e),
             "extracted_text": ""
         }
+    # ... (end of verify_document) ... - but wait, the file ended at 429. I should append.
+# Actually I will use replace with append logic or just add before end of file?
+# The file ends at 429. I will append the new endpoint at the end.
+@app.get("/test-samples")
+def get_test_samples():
+    """Returns a random list of test samples from CSV."""
+    samples = []
+    csv_path = "dataset.csv"
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f) # assumes header: text,label
+                all_rows = list(reader)
+                if all_rows:
+                    # Pick 6 random
+                    selected = random.sample(all_rows, min(6, len(all_rows)))
+                    samples = [row["text"] for row in selected]
+        except Exception as e:
+            print(f"Error reading CSV: {e}")
+            
+    if not samples:
+        samples = ["Sample 1 (fallback)", "Sample 2 (fallback)"]
+        
+    return {"samples": samples}

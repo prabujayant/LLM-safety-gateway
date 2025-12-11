@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, Mic, Send, Square } from "lucide-react"
+import { Upload, Mic, Send, Square, RefreshCw, Play } from "lucide-react"
 
 interface InputPanelProps {
   onSubmit: (data: any) => void
@@ -18,11 +18,14 @@ export default function InputPanel({ onSubmit }: InputPanelProps) {
   const [bypassFilter, setBypassFilter] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const [testSamples, setTestSamples] = useState<string[]>([])
+  const [loadingSamples, setLoadingSamples] = useState(false)
 
   // Initialize audio recording
   useEffect(() => {
@@ -252,6 +255,55 @@ export default function InputPanel({ onSubmit }: InputPanelProps) {
     }
   }
 
+  const generateTestSamples = async () => {
+    setLoadingSamples(true)
+    try {
+      const res = await fetch("/api/test-samples")
+      if (res.ok) {
+        const data = await res.json()
+        setTestSamples(data.samples || [])
+      }
+    } catch (e) {
+      console.error("Failed to fetch samples", e)
+    } finally {
+      setLoadingSamples(false)
+    }
+  }
+
+  const runSample = (sample: string) => {
+    setTextInput(sample)
+    setInputMode("text")
+    // Use timeout to allow state update before submitting
+    setTimeout(async () => {
+      // We need to call the logic of handleTextSubmit but using the sample directly 
+      // because state update might not be compliant with closure here if we just call handleTextSubmit() which uses textInput state
+      // So let's modify handleTextSubmit to accept an optional arg or just logic duplication (cleaner to use arg)
+      // But for minimal edit, I'll assume textInput update + timeout works or refactor handleTextSubmit.
+
+      // Better: Call api directly here or refactor handleTextSubmit to take arg.
+      // Let's refactor handleTextSubmit to take optional text.
+
+      // Actually, just calling a helper:
+      const submitText = async (text: string) => {
+        if (!text.trim()) return
+        try {
+          const response = await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: text }),
+          })
+          if (!response.ok) throw new Error("Failed")
+          const result = await response.json()
+          onSubmit({ ...result, prompt: text })
+        } catch (error) {
+          console.error(error)
+          onSubmit(null)
+        }
+      }
+      submitText(sample)
+    }, 0)
+  }
+
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
       <CardHeader>
@@ -261,16 +313,14 @@ export default function InputPanel({ onSubmit }: InputPanelProps) {
       <CardContent className="space-y-4">
         {/* Input Mode Tabs */}
         <div className="flex gap-2 flex-wrap">
-          {(["text", "image", "pdf", "voice"] as const).map((mode) => (
+          {(["text", "image"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setInputMode(mode)}
-              disabled={isRecording}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors capitalize disabled:opacity-50 ${
-                inputMode === mode
-                  ? "bg-primary/20 text-primary border border-primary/50"
-                  : "bg-primary/5 text-muted-foreground border border-border/30 hover:bg-primary/10"
-              }`}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${inputMode === mode
+                ? "bg-primary/20 text-primary border border-primary/50"
+                : "bg-primary/5 text-muted-foreground border border-border/30 hover:bg-primary/10"
+                }`}
             >
               {mode}
             </button>
@@ -333,11 +383,10 @@ export default function InputPanel({ onSubmit }: InputPanelProps) {
               <button
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={isProcessing}
-                className={`mx-auto p-4 rounded-full transition-all disabled:opacity-50 ${
-                  isRecording
-                    ? "bg-destructive/20 text-destructive border-2 border-destructive/50 hover:bg-destructive/30"
-                    : "bg-primary/20 text-primary border-2 border-primary/50 hover:bg-primary/30"
-                }`}
+                className={`mx-auto p-4 rounded-full transition-all disabled:opacity-50 ${isRecording
+                  ? "bg-destructive/20 text-destructive border-2 border-destructive/50 hover:bg-destructive/30"
+                  : "bg-primary/20 text-primary border-2 border-primary/50 hover:bg-primary/30"
+                  }`}
               >
                 {isRecording ? <Square className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
               </button>
@@ -374,6 +423,42 @@ export default function InputPanel({ onSubmit }: InputPanelProps) {
           <Send className="w-4 h-4 mr-2" />
           {isProcessing ? "Processing..." : "Submit to Gateway"}
         </Button>
+
+        {/* Test Data Generator */}
+        <div className="pt-6 border-t border-border/50">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Test Data Generator</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateTestSamples}
+              disabled={loadingSamples}
+              className="h-8"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loadingSamples ? "animate-spin" : ""}`} />
+              Generate Samples
+            </Button>
+          </div>
+
+          {testSamples.length > 0 && (
+            <div className="space-y-2">
+              {testSamples.map((sample, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+                  <p className="text-xs flex-1 truncate font-mono text-muted-foreground group-hover:text-foreground">{sample}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => runSample(sample)}
+                    title="Run Analysis"
+                  >
+                    <Play className="w-3.5 h-3.5 text-primary" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

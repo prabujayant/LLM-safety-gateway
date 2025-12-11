@@ -1,9 +1,11 @@
 import io
 import json
+import os
 from PIL import Image
 import piexif
 import easyocr
 from typing import Dict, List, Tuple
+import numpy as np
 
 # Initialize OCR reader (cached globally to avoid reloading)
 try:
@@ -12,6 +14,63 @@ try:
 except Exception as e:
     print(f"[ImageProcessor] Warning: Could not initialize EasyOCR: {e}")
     reader = None
+
+# Initialize QR Code Classifier
+qr_classifier = None
+try:
+    import tensorflow as tf
+    qr_model_path = os.path.join(os.path.dirname(__file__), "qr_classifier.keras")
+    if os.path.exists(qr_model_path):
+        qr_classifier = tf.keras.models.load_model(qr_model_path)
+        print("[ImageProcessor] QR Classifier loaded successfully")
+    else:
+        print(f"[ImageProcessor] QR Classifier not found at {qr_model_path}")
+except Exception as e:
+    print(f"[ImageProcessor] Warning: Could not load QR Classifier: {e}")
+    qr_classifier = None
+
+
+def classify_qr_image(image_bytes: bytes) -> Tuple[bool, float]:
+    """
+    Classify a QR code image as malicious or benign.
+    
+    Args:
+        image_bytes: Raw image data
+        
+    Returns:
+        Tuple of (is_malicious, confidence)
+    """
+    if qr_classifier is None:
+        print("[ImageProcessor] QR Classifier not loaded, skipping classification")
+        return False, 0.0
+    
+    try:
+        # Load and preprocess image
+        image = Image.open(io.BytesIO(image_bytes))
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Resize to model input size (224x224)
+        image = image.resize((224, 224))
+        
+        # Convert to array and normalize
+        img_array = np.array(image, dtype=np.float32) / 255.0
+        img_array = np.expand_dims(img_array, 0)  # Add batch dimension
+        
+        # Predict
+        prediction = qr_classifier.predict(img_array, verbose=0)[0][0]
+        
+        # prediction > 0.5 means malicious
+        is_malicious = bool(prediction > 0.5)
+        confidence = float(prediction if is_malicious else 1 - prediction)
+        
+        print(f"[ImageProcessor] QR Classification: {'MALICIOUS' if is_malicious else 'BENIGN'} ({confidence:.2%})")
+        return is_malicious, confidence
+    except Exception as e:
+        print(f"[ImageProcessor] QR Classification error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, 0.0
 
 
 def extract_metadata(image_bytes: bytes) -> Dict:
@@ -244,12 +303,16 @@ def analyze_image(image_bytes: bytes, filename: str = "image") -> Dict:
         # 3. Detect hidden content
         hidden_content = detect_hidden_content(extracted_text, image_bytes)
         
-        # 4. Calculate combined risk score
+        # 4. QR Code Classification (if model is available)
+        is_malicious_qr, qr_confidence = classify_qr_image(image_bytes)
+        qr_risk = 60 if is_malicious_qr else 0  # High risk for malicious QR
+        
+        # 5. Calculate combined risk score
         base_risk = hidden_content["risk_score"]
         metadata_risk = len(metadata.get("suspicious_indicators", [])) * 5
         ocr_confidence_factor = (1 - confidence) * 30 if confidence < 0.7 else 0
         
-        combined_risk = min(100, base_risk + metadata_risk + ocr_confidence_factor)
+        combined_risk = min(100, base_risk + metadata_risk + ocr_confidence_factor + qr_risk)
         
         result = {
             "success": True,
@@ -258,6 +321,11 @@ def analyze_image(image_bytes: bytes, filename: str = "image") -> Dict:
             "ocr_details": ocr_details,
             "metadata": metadata,
             "hidden_content_analysis": hidden_content,
+            "qr_classification": {
+                "is_malicious": is_malicious_qr,
+                "confidence": qr_confidence,
+                "model_loaded": qr_classifier is not None
+            },
             "combined_risk_score": combined_risk,
             "analysis_summary": {
                 "text_found": len(extracted_text) > 0,
@@ -265,12 +333,13 @@ def analyze_image(image_bytes: bytes, filename: str = "image") -> Dict:
                 "confidence": f"{confidence:.2%}",
                 "suspicious_indicators": len(metadata.get("suspicious_indicators", [])),
                 "jailbreak_attempts": len(hidden_content.get("jailbreak_attempts", [])),
-                "encoded_patterns": len(hidden_content.get("encoded_patterns", []))
+                "encoded_patterns": len(hidden_content.get("encoded_patterns", [])),
+                "malicious_qr_detected": is_malicious_qr
             }
         }
         
         print(f"[ImageProcessor] Analysis complete - Risk: {combined_risk}/100, "
-              f"Text blocks: {len(ocr_details)}, Confidence: {confidence:.2%}")
+              f"Text blocks: {len(ocr_details)}, QR Malicious: {is_malicious_qr}")
         
         return result
     except Exception as e:

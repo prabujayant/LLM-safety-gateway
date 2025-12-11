@@ -22,6 +22,7 @@ class AnalyzeResponse(BaseModel):
     wrapped_prompt: Optional[str]
     ppa_template_id: Optional[str]
     processing_ms: float
+    llm_response: Optional[str] = None  # Auto-filled when action is "pass"
 
 
 class AttackLogItem(BaseModel):

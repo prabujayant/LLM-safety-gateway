@@ -61,14 +61,13 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex min-h-[calc(100vh-4rem)]">
         {/* Sidebar */}
         <aside
-          className={`${
-            sidebarOpen ? "w-64" : "w-0"
-          } border-r border-border/50 bg-sidebar/50 hidden lg:block lg:w-64 transition-all duration-300 overflow-hidden`}
+          className={`${sidebarOpen ? "w-64" : "w-0"
+            } border-r border-border/50 bg-sidebar/50 hidden lg:block lg:w-64 transition-all duration-300 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto`}
         >
-          <div className="p-6 space-y-6 h-full overflow-y-auto">
+          <div className="p-6 space-y-6">
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Menu</h3>
               <div className="space-y-2">
@@ -80,11 +79,10 @@ export default function Dashboard() {
                   <button
                     key={item.id}
                     onClick={() => setCurrentTab(item.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      currentTab === item.id
-                        ? "bg-primary/20 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-primary/10"
-                    }`}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${currentTab === item.id
+                      ? "bg-primary/20 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-primary/10"
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -94,13 +92,13 @@ export default function Dashboard() {
 
             <div className="pt-6 border-t border-border/30">
 
-              
+
             </div>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1">
           <div className="p-4 sm:p-6 lg:p-8">
             {currentTab === "gateway" && (
               <div className="space-y-6">
@@ -115,8 +113,13 @@ export default function Dashboard() {
                     <ThreatResultPanel data={lastResult} developerMode={developerMode} />
                     {lastResult?.image_analysis && <ImageAnalysisPanel data={lastResult} />}
                     {lastResult?.documentAnalysis && <DocumentAnalysisPanel data={lastResult} />}
-                    <MetricsPanel lastResult={lastResult} />
-                    <PPADemo lastResult={lastResult} />
+                    {/* Hide MetricsPanel and PPA for image analysis */}
+                    {lastResult && lastResult.input_source !== "image" && (
+                      <>
+                        <MetricsPanel lastResult={lastResult} />
+                        <PPADemo lastResult={lastResult} />
+                      </>
+                    )}
                   </div>
                 </div>
 

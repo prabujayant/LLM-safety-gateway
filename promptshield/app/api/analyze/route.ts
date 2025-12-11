@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       ppa_template_id: backendData.ppa_template_id,
       processing_ms: backendData.processing_ms,
       client_ms: processingMs,
+      llm_response: backendData.llm_response,
     })
   } catch (error) {
     console.error("Analysis error:", error)

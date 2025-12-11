@@ -14,3 +14,4 @@ piexif
 requests
 PyPDF2
 python-docx
+tensorflow

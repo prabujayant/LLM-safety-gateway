@@ -5,7 +5,12 @@ import base64
 from typing import Dict, Any, List, Tuple
 
 import numpy as np
-from sklearn.ensemble import IsolationForest
+import numpy as np
+import csv
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import make_pipeline
 
 # ------------ 1. Regex patterns (direct injection) ------------
 
@@ -152,81 +157,71 @@ def entropy_score(text: str) -> int:
     return score
 
 
-# ------------ 4. Lightweight anomaly detection (IsolationForest) ------------
-
-def extract_features(text: str) -> np.ndarray:
-    """
-    Very cheap handcrafted features (0.1–0.5 ms scale).
-    In a real system, train this model offline and just load it.
-    """
-    length = len(text)
-    num_newlines = text.count("\n")
-    num_digits = sum(ch.isdigit() for ch in text)
-    num_special = sum(not ch.isalnum() and not ch.isspace() for ch in text)
-    upper_ratio = sum(ch.isupper() for ch in text) / length if length else 0
-    digit_ratio = num_digits / length if length else 0
-    special_ratio = num_special / length if length else 0
-    return np.array(
-        [
-            length,
-            num_newlines,
-            num_digits,
-            num_special,
-            upper_ratio,
-            digit_ratio,
-            special_ratio,
-        ],
-        dtype=float,
-    ).reshape(1, -1)
-
-
-class AnomalyModel:
+class MLModel:
     def __init__(self):
+        # Train on CSV data at startup
+        texts = []
+        labels = []
         
-        rng = np.random.RandomState(42)
-        benign_samples = []
-        for _ in range(200):
-            length = rng.randint(10, 500)
-            newlines = rng.randint(0, 5)
-            digits = rng.randint(0, length // 5 + 1)
-            specials = rng.randint(0, length // 10 + 1)
-            upper_ratio = rng.uniform(0, 0.3)
-            digits_ratio = digits / length
-            specials_ratio = specials / length
-            benign_samples.append(
-                [
-                    length,
-                    newlines,
-                    digits,
-                    specials,
-                    upper_ratio,
-                    digits_ratio,
-                    specials_ratio,
-                ]
-            )
-        X = np.array(benign_samples)
-        self.model = IsolationForest(
-            n_estimators=50,
-            max_samples="auto",
-            contamination=0.05,
-            random_state=42,
-            n_jobs=1,
+        # Load primary dataset (100 samples with safe/sanitize/block)
+        csv_path = "dataset.csv"
+        if os.path.exists(csv_path):
+            with open(csv_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    texts.append(row["text"])
+                    labels.append(row["label"])
+            print(f"[ML Model] Loaded {len(texts)} samples from dataset.csv")
+        
+        # Load additional synthetic dataset (4500 samples with harmful/safe)
+        synthetic_path = "../synthetic_dataset.csv"
+        if os.path.exists(synthetic_path):
+            count_before = len(texts)
+            with open(synthetic_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    prompt = row.get("prompt_clean", "")
+                    label = row.get("label", "safe")
+                    if prompt.strip():
+                        texts.append(prompt)
+                        # Map 'harmful' -> 'block', 'safe' -> 'safe'
+                        labels.append("block" if label == "harmful" else "safe")
+            print(f"[ML Model] Loaded {len(texts) - count_before} samples from synthetic_dataset.csv")
+        
+        if not texts:
+            print("[ML Model] Warning: No training data found. Using placeholder.")
+            texts = ["placeholder"]
+            labels = ["safe"]
+
+        self.pipeline = make_pipeline(
+            TfidfVectorizer(stop_words="english", max_features=1000),
+            RandomForestClassifier(n_estimators=100, random_state=42)
         )
-        self.model.fit(X)
+        self.pipeline.fit(texts, labels)
+        print(f"[ML Model] Random Forest trained on {len(texts)} total samples.")
 
     def anomaly_score(self, text: str) -> int:
         """
-        Return 0-30 based on anomaly. We map IsolationForest score to a bucket.
+        Return score based on class prediction:
+        - Block: 90
+        - Sanitize: 50
+        - Safe: 0
         """
-        feat = extract_features(text)
-        # score_samples: higher is more normal. We invert.
-        raw = self.model.score_samples(feat)[0]
-        # Typical scores around -0.5 to 0.2; normalize heuristically.
-        normalized = max(0.0, min(1.0, 0.5 - raw))  # 0 normal, 1 weird
-        return int(normalized * 30)
+        if not text.strip():
+            return 0
+        try:
+            pred = self.pipeline.predict([text])[0]
+            if pred == "block":
+                return 90
+            elif pred == "sanitize":
+                return 50
+            return 0
+        except Exception as e:
+            print(f"ML Prediction error: {e}")
+            return 0
 
 
-anomaly_model = AnomalyModel()
+anomaly_model = MLModel()
 
 # ------------ Risk aggregation ------------
 

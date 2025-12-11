@@ -94,6 +94,24 @@ export default function DeveloperModePanel({ threatData }: DeveloperModePanelPro
           <div className="font-mono text-sm bg-input px-3 py-2 rounded">{mockMetrics.base64Decoded}</div>
         </div>
 
+        {/* PPA - Polymorphic Prompt Assembling */}
+        {threatData.wrapped_prompt && (
+          <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Polymorphic Prompt Assembling (PPA)
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Same sanitized content, different wrappers per request.
+            </p>
+            <div className="font-mono text-sm bg-input px-3 py-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+              {threatData.wrapped_prompt}
+            </div>
+            {threatData.ppa_template_id && (
+              <p className="text-xs text-accent mt-2">Template ID: {threatData.ppa_template_id}</p>
+            )}
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground italic pt-4 border-t border-border/30">
           These metrics represent the internal detection pipeline. Real deployments would show actual analysis results.
         </p>
